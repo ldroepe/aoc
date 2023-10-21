@@ -8,6 +8,23 @@
 
 static const std::string input = "../day1.in";
 
+template <typename It>
+void printc(const std::string& pref, It first, It last)
+{
+
+    std::cout << pref << ": ";
+    while(first != last)
+    {
+        std::cout << *first << ' ';
+        ++first;
+    }
+
+    std::cout << '\n';
+}
+
+template <typename Container>
+void printc(const std::string& pref, const Container& c) { printc(pref, std::cbegin(c), std::cend(c)); }
+
 #ifdef PART_ONE_SOLUTION
 int count_calories(std::istream& in)
 {
@@ -46,14 +63,14 @@ private:
     Container& c;
     Comp comp;
 
-    using this_ref_t = heap_back_inserter<Container, Comp>&;
+    using reference = heap_back_inserter<Container, Comp>&;
 
 public:
     explicit heap_back_inserter(Container& container, Comp compare=Comp()):
         c(container), comp(compare) {}
-    this_ref_t operator++() { return *this; }
-    this_ref_t operator*() { return *this; }
-    this_ref_t operator=(typename Container::value_type v) {
+    reference operator++() { return *this; }
+    reference operator*() { return *this; }
+    reference operator=(typename Container::value_type v) {
         c.push_back(std::move(v));
         std::push_heap(std::begin(c), std::end(c), comp);
         return *this;
@@ -76,31 +93,34 @@ int count_calories(std::istream& in)
     return total;
 }
 
-// push_back --> O(1) b/c we reserved
-// std::push_heap --> O(lg(N+1)), N=3
-// std::min_element --> O(N-1), N=3
-// pop_back --> O(1)
+/* n = input size (number of lines in day1.in
+ * m = number of largest calories to count
+ *
+ * std::make_heap = O(m) ==> O(1)
+ * std::push_heap = O(log(m)) ==> O(1)
+ * std::pop_heap = O(log(m)) ==> O(1)
+ * std::pop_back = O(1)
+ *
+ * Therefore, using a min heap has allowed this procedure to run in O(n) time,
+ * while using constant storage
+ */
 std::vector<int> collect_all_calorie_counts(std::istream& in)
 {
-    std::vector<int> calories;
+    using calorie_t = int;
+    const auto comp = std::greater<calorie_t>();
+    
+    std::vector<calorie_t> calories;
     calories.reserve(n+1); // only storing 4 elements at most
-    auto heap_inserter = make_heap_inserter(calories);
+    auto heap_inserter = make_heap_inserter(calories, comp);
 
     for(int i = 0; i < n; ++i)
         *heap_inserter = count_calories(in); // requires in has at least n lines
 
     while(in)
     {
-        const int c = count_calories(in);
+        const calorie_t c = count_calories(in);
         *heap_inserter = c;
-
-        // remove the smallest element from a max heap
-        // relise on the fact that there are 3 elements in the heap, so removing
-        // the smallest element in this way will still preserve the heap
-        // property
-        // can't use c[begin|end] here bc we need a non-const ref for std::swap
-        const auto smallest_elem = std::min_element(std::begin(calories), std::end(calories));
-        std::swap(*smallest_elem, calories.back());
+        std::pop_heap(std::begin(calories), std::end(calories), comp);
         calories.pop_back();
     }
 
